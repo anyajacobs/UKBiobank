@@ -42,7 +42,7 @@ colnames(mf_long)
 head(mf_long[,25:31], 20)
 
 
-## ~ merge with hospital data ###### 
+### ~ merge with hospital data ####
 # admissions, hospital days, costs
 
 mf_longhosp <- merge(mf_long, finalhospdata_byICD, by=c("eid", "fu_year"), all.x = T) %>% arrange(eid, fu_year)
@@ -58,7 +58,7 @@ mf_longhosp$respadmi_byfuyear[is.na(mf_longhosp$respadmi_byfuyear)] <- 0
 # so we still have the OG NA's in resp_admi and asthma_admi (and in ICD_diag01) ~ [these aren't YEARLY though]
 # but the yearly resp_admi's NA's have been turned to 0, so note they are non-distinguishable from years with no hospital visits at all
 
-## ~ subset to remove years where completion is 0 ######
+### ~ subset to remove years where completion is 0 ####
 mf_longhosp <- subset(mf_longhosp, fu_completion>0)
 
 ### ~ remove duplicate fu_years - make eid AND fu_year distinct #####
@@ -87,7 +87,7 @@ sr_longhosp <- readRDS(file.path(work_data, "sr_longhosp.rds"))
 
 
 
-## create binary "died" variable ####
+### ~ create binary "died" variable #####
 ## determine no. of deaths in each follow-up year ##
 
 # make new column of binary death (1 or 0) for yes or no
@@ -173,7 +173,7 @@ table(submf_mildcontrols$fu_year)
 
 
 
-## ~ exclude fu_years>10 (& further filtering by fu_completion #####
+### ~ exclude fu_years>10 (& further filtering by fu_completion..) #####
 
 ## Exclude years of follow-up beyond 10 and use this for all following analyses.
 
@@ -688,7 +688,7 @@ mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_16")
 mr_longhosp10y <- mr_longhosp10y %>% filter((fu_completion==1 & died==0) | (fu_completion<=1 & died==1))
 
 
-### Annual hospital data (descriptive) for mr dataset ##
+###### Final: annual hospital data (descriptive) for MR dataset ####
 
 ## annual hospital data ("admi_n", "hdays_byfuyear", "totcost_byfuyear")
 ## overall AND by FU_year, and admissions by ICD chapter data, prop. years of FU...
@@ -956,7 +956,7 @@ head(sr_longhosp10y)
 
 
 
-### Annual hospital data (descriptive) for SR dataset ##
+####### Final: annual hospital data (descriptive) for SR dataset ####
 
 ## annual hospital data ("admi_n", "hdays_byfuyear", "totcost_byfuyear")
 ## overall AND by FU_year, and admissions by ICD chapter data, prop. years of FU...

@@ -35,7 +35,7 @@ UKB_a$age.group <- ifelse(UKB_a$age.recruit<45, "<45",
 
 # Bulk data ---------------------------------------------------------------
 
-# the variables such as MI.hes, stroke.hes and CRV.hes derived from bulk HES data 
+# the variables such as MI.hes and stroke.hes derived from bulk HES data 
 # are basically the same as those from main dataset
 # However, bulk data are updated more frequently than main dataset
 # I'd recommend to use those from bulk HES data
@@ -187,29 +187,8 @@ hesin_oper <- hesin_oper[, colSums(is.na(hesin_oper))<nrow(hesin_oper)]
 
 # scan the code row by row to check if there is our interested ones
 
-# CRV
-hesin_oper$CRV.hes <- 0
-for (i in 0:23) { 
-  text2 <- paste0("oper4_",i)
-  hesin_oper$CRV.hes[grepl("^K49|^K75|^K76|^K40|^K41|^K42|^K43|^K44|^K45|^K46|K501|K504", 
-                           hesin_oper[[text2]])] <- 1 
-}
-
-hesin_CRV <- hesin_oper %>% filter(CRV.hes==1) %>% 
-  select("eid", "ins_index", "date") %>% group_by(eid) %>% 
-  mutate(ins = 1:n(), ins_index=NULL) %>% spread(ins, date)
-
-# finally select the earliest date among the all
-hesin_CRV$CRV.hes.date <- apply(hesin_CRV[, -1], 1, function(x) min(x, na.rm = T))
-hesin_CRV$CRV.hes.date <- as.Date(hesin_CRV$CRV.hes.date)
-# output
-hesin_CRV <- hesin_CRV %>% select("eid", "CRV.hes.date") %>% mutate(CRV.hes=1)
-
-UKB_a <- merge(UKB_a, hesin_CRV, by.x = "id", by.y = "eid", all.x = T)
-UKB_a$CRV.hes[is.na(UKB_a$CRV.hes)] <- 0
-
 # remove hesin data
-rm(hesin_diag, hesin, hesin_oper, hesin_MI, hesin_stroke, hesin_CRV, hesin_cancer)
+rm(hesin_diag, hesin, hesin_oper, hesin_MI, hesin_stroke, hesin_cancer)
 
 
 ### death based on bulk data --------------------------------------------------
@@ -245,32 +224,6 @@ colnames(death)[4] <- "ICD10_prim"
 death <- merge(death, death_cause_sec, by=c("eid", "ins_index"), all.x = T)
 colnames(death) <- sub("cause_icd10", "ICD10_sec", colnames(death))
 
-# vascular death
-# all ICD-10 I category: circulatory
-# all ICD-10 R category: unclassfied elsewhere
-death$VD <- 0
-death$VD[grepl("^I", death$ICD10_prim) | 
-           grepl("^R", death$ICD10_prim)] <- 1
-# on the condition of CVD as a secondary cause 
-# Y832: anastomosis, bypass or graft
-# Y835: amputation of limb
-# W19: unspecified fall
-for (i in 1:14) {
-  text1 <- paste0("ICD10_sec_",i)
-  death$VD[grepl("^I", death[[text1]]) & (death$ICD10_prim %in% 
-                                            c("Y832", "Y835") | grepl("^W19", death$ICD10_prim))] <- 1
-}
-
-death_VD <- death %>% filter(VD==1) %>% 
-  select(eid, date) %>% 
-  distinct(eid, .keep_all = T) %>% 
-  mutate(death.vascular=1) %>% 
-  rename(death.vascular.date=date)
-
-# merge to UKB_a
-UKB_a <- merge(UKB_a, death_VD, by.x = "id", by.y = "eid", all.x = T)
-UKB_a$death.vascular[is.na(UKB_a$death.vascular)] <- 0
-
 # all death
 death_all <- death %>% select(eid, date) %>% 
   distinct(eid, .keep_all = T) %>% 
@@ -279,14 +232,6 @@ death_all <- death %>% select(eid, date) %>%
 
 UKB_a <- merge(UKB_a, death_all, by.x = "id", by.y = "eid", all.x = T)
 UKB_a$death.allcause[is.na(UKB_a$death.allcause)] <- 0
-
-# non-vascular death
-UKB_a$death.nonvascular <- ifelse(UKB_a$death.allcause==1 & 
-                                    UKB_a$death.vascular==0, 1, 0)
-
-UKB_a$death.nonvascular.date <- UKB_a$death.date
-UKB_a$death.nonvascular.date[UKB_a$death.vascular==1] <- NA
-
 
 
 # -------------------------------------------------------------------------------------- # 
@@ -626,75 +571,6 @@ UKB_a$stroke.all.date <- temp$date
 
 # finally also complement stroke baseline
 UKB_a$stroke.baseline[UKB_a$stroke.fo.pre==1] <- 1
-
-
-### CRV ---------------------------------------------------------------------
-
-# only use hospital diagnoses
-# no baseline CRV
-
-UKB_a$CRV.inpatient <- 0
-# MI codes include: all K49X, K501, all K75X, all K76X, all K40X
-# all K41X, all K42X, all K43X, all K44X, all K45X, all K46X in OPCS-4
-for (i in 0:116) { # f.41272 has 117 arrays
-  text2 <- paste0("f.41272.0.",i)
-  UKB_a$CRV.inpatient[grepl("^K49|^K75|^K76|^K40|^K41|^K42|^K43|^K44|^K45|^K46|K501|K504", bd[[text2]])] <- 1
-}
-
-# CRV date
-temp <- as.data.frame(UKB_a$CRV.inpatient)
-# OPCS-4 only
-# dates linked to OPCS-3 codes are no later than 1989, so don't use them
-for (i in 0:116) { # f.41282 has 117 arrays, corresponding to 41272
-  text1 <- paste0("CRV.inpatient.date.", i)
-  text2 <- paste0("f.41272.0.",i)
-  text3 <- paste0("f.41282.0.",i)
-  temp[[text1]] <- NA
-  temp[[text1]] <- as.Date(temp[[text1]])
-  temp[[text1]][grepl("^K49|^K75|^K76|^K40|^K41|^K42|^K43|^K44|^K45|^K46|K501|K504", bd[[text2]]) & 
-                  !is.na(bd[[text2]])] <- 
-    bd[[text3]][grepl("^K49|^K75|^K76|^K40|^K41|^K42|^K43|^K44|^K45|^K46|K501|K504", bd[[text2]]) & 
-                  !is.na(bd[[text2]])]
-}
-
-for (i in 0:116){
-  text1 <- paste0("CRV.inpatient.date.", i)
-  temp[[text1]][temp[[text1]] < UKB_a$recruit.date] <- NA
-}
-temp$`UKB_a$CRV.inpatient` <- NULL
-temp <- temp[, colSums(is.na(temp))<nrow(temp)]
-earliest <- apply(temp[rowSums(is.na(temp)) < 
-                         ncol(temp), ], 1, function(x) min(x, na.rm = T))
-temp$key <- as.numeric(rownames(temp))
-earliest <- data.frame(date=earliest, key=as.numeric(names(earliest)))
-temp <- merge(temp, earliest, all = T) 
-# give the value to UKB_a
-UKB_a$CRV.inpatient.date <- temp$date
-UKB_a$CRV.inpatient.date <- as.Date(UKB_a$CRV.inpatient.date)
-
-# post-recruitment 
-UKB_a$CRV.inpatient.post <- UKB_a$CRV.inpatient
-UKB_a$CRV.inpatient.post[is.na(UKB_a$CRV.inpatient.date)] <- 0
-
-# CRV.hes include all CRV.inpatient.post
-UKB_a$CRV.all.post <- UKB_a$CRV.hes
-
-# so just pick up the earliest date among the two
-earliest <- apply(UKB_a[UKB_a$CRV.inpatient.post==1 | UKB_a$CRV.hes, 
-                        c("CRV.inpatient.date", "CRV.hes.date")], 1, function(x) min(x, na.rm = T))
-earliest <- data.frame(date=earliest, key=as.numeric(names(earliest)))
-
-temp <- as.data.frame(UKB_a$CRV.hes.date)
-temp$key <- as.numeric(rownames(temp))
-temp <- merge(temp, earliest, all = T) 
-
-temp$date <- as.Date(temp$date)
-
-UKB_a$CRV.all.date <- temp$date
-
-# check 
-# identical(UKB_a$CRV.all.date, UKB_a$CRV.hes.date)
-# the two are the same, so we actually only need to use CRV.hes data
 
 
 ### cancer ------------------------------------------------------------------
@@ -1441,7 +1317,7 @@ UKB_a$diabetes.T1.fo.pre[UKB_a$diabetes.T1.fo.pre==0 & !is.na(UKB_a$insulin_date
 
 UKB_a$diabetes.T1.fo.pre.date[is.na(UKB_a$diabetes.T1.fo.pre.date) & UKB_a$diabetes.T1.fo.pre==1] <- 
   UKB_a$medidate_pre[is.na(UKB_a$diabetes.T1.fo.pre.date) & UKB_a$diabetes.T1.fo.pre==1]
-# above, not necessarily insulin date, but whatever date earilier
+# above, not necessarily insulin date, but whatever date earlier
 
 # T2
 UKB_a$diabetes.T2.fo.pre[UKB_a$diabetes.T2.fo.pre==0 & UKB_a$diabetes.T1.fo.pre==0 & 
@@ -1800,19 +1676,6 @@ UKB_a$PVD_fo_date <- NULL
 UKB_a$PVD.opcs <- NULL
 
 
-### CVD history (primary/secondary) -----------------------------------------
-
-UKB_a$CVhist <- UKB_a$MI.baseline + UKB_a$stroke.baseline + UKB_a$PVD + UKB_a$othCHD
-
-UKB_a$CVD <- ifelse(UKB_a$CVhist==0, "None",
-                    ifelse(UKB_a$CVhist==1 & UKB_a$MI.baseline==1, "MI only",  
-                           ifelse(UKB_a$CVhist==1 & UKB_a$stroke.baseline==1, "Stroke only", 
-                                  ifelse(UKB_a$CVhist==1 & UKB_a$PVD==1, "PVD only", 
-                                         ifelse(UKB_a$CVhist==1 & UKB_a$othCHD==1, "other CHD only", "Two or more")))))
-UKB_a$CVD <- relevel(as.factor(UKB_a$CVD), ref = "None")
-
-
-
 # -------------------------------------------------------------------------------------- # 
 # Algorithms of other variables #####
 # -------------------------------------------------------------------------------------- # 
@@ -1906,88 +1769,6 @@ UKB_a[[text1]][UKB_a[[text2]]>=25 & UKB_a[[text2]]<30] <- "25-30"
 UKB_a[[text1]][UKB_a[[text2]]>=30 & UKB_a[[text2]]<35] <- "30-35"
 UKB_a[[text1]][UKB_a[[text2]]>=35 & UKB_a[[text2]]<40] <- "35-40"
 UKB_a[[text1]][UKB_a[[text2]]>=40] <- "40+"
-
-
-
-### IMD: England, Wales, and Scotland separately ####
-# generate residential country using availability of IMD
-UKB_a$England <- ifelse(is.na(bd$f.26410.0.0), 0, 1)
-UKB_a$Wales <- ifelse(is.na(bd$f.26426.0.0), 0, 1)
-UKB_a$Scotland <- ifelse(is.na(bd$f.26427.0.0), 0, 1)
-
-# according to the imd_baseline.pdf from UKB, assign the IMD sources
-# IMD2004: 2004, 2005, 2006
-# IMD2007: 2007, 2008, 2009
-# IMD2010: 2010
-# WIMD2005: 2006, 2007
-# WIMD2008: 2008, 2009, 2010
-# SIMD2006: 2006, 2007, 2008
-# SIMD2009: 2009, 2010
-
-UKB_a$IMD.source <- NA
-UKB_a$IMD.source[UKB_a$England==1 & UKB_a$recruit.date < "2007-01-01"] <- "IMD2004"
-UKB_a$IMD.source[UKB_a$England==1 & UKB_a$recruit.date >= "2007-01-01" 
-                 & UKB_a$recruit.date< "2010-01-01"] <- "IMD2007"
-UKB_a$IMD.source[UKB_a$England==1 & UKB_a$recruit.date >= "2010-01-01"] <- "IMD2010"
-
-UKB_a$IMD.source[UKB_a$Scotland==1 & UKB_a$recruit.date < "2009-01-01"] <- "SIMD2006"
-UKB_a$IMD.source[UKB_a$Scotland==1 & UKB_a$recruit.date >= "2009-01-01"] <- "SIMD2009"
-
-UKB_a$IMD.source[UKB_a$Wales==1 & UKB_a$recruit.date < "2008-01-01"] <- "WIMD2005"
-UKB_a$IMD.source[UKB_a$Wales==1 & UKB_a$recruit.date >= "2008-01-01"] <- "WIMD2008"
-
-# Quintile cutoffs of IMD of different sources
-# IMD2004: 8.35; 13.72; 21.15; 34.20
-# IMD2007: 8.32; 13.74; 21.22; 34.42
-# IMD2010: 8.49; 13.79; 21.35; 34.17
-# SIMD2006: 7.75; 13.56; 21.05; 33.70
-# SIMD2009: 7.76; 13.76; 21.02; 33.72
-# WIMD2005: 9.96; 14.94; 21.16; 32.70
-# WIMD2008: 9.8; 14.8; 21.2; 32.5
-
-# generate IMD quintile
-UKB_a$IMD.Q5 <- NA
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2004" & bd$f.26410.0.0 <= 8.35] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2004" & bd$f.26410.0.0 > 8.35 & bd$f.26410.0.0 <= 13.72] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2004" & bd$f.26410.0.0 > 13.72 & bd$f.26410.0.0 <= 21.15] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2004" & bd$f.26410.0.0 > 21.15 & bd$f.26410.0.0 <= 34.20] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2004" & bd$f.26410.0.0 > 34.20] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2007" & bd$f.26410.0.0 <= 8.32] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2007" & bd$f.26410.0.0 > 8.32 & bd$f.26410.0.0 <= 13.74] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2007" & bd$f.26410.0.0 > 13.74 & bd$f.26410.0.0 <= 21.22] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2007" & bd$f.26410.0.0 > 21.22 & bd$f.26410.0.0 <= 34.42] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2007" & bd$f.26410.0.0 > 34.42] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2010" & bd$f.26410.0.0 <= 8.49] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2010" & bd$f.26410.0.0 > 8.49 & bd$f.26410.0.0 <= 13.79] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2010" & bd$f.26410.0.0 > 13.79 & bd$f.26410.0.0 <= 21.35] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2010" & bd$f.26410.0.0 > 21.35 & bd$f.26410.0.0 <= 34.17] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="IMD2010" & bd$f.26410.0.0 > 34.17] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2006" & bd$f.26427.0.0 <= 7.75] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2006" & bd$f.26427.0.0 > 7.75 & bd$f.26427.0.0 <= 13.56] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2006" & bd$f.26427.0.0 > 13.56 & bd$f.26427.0.0 <= 21.05] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2006" & bd$f.26427.0.0 > 21.05 & bd$f.26427.0.0 <= 33.70] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2006" & bd$f.26427.0.0 > 33.70] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2009" & bd$f.26427.0.0 <= 7.76] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2009" & bd$f.26427.0.0 > 7.76 & bd$f.26427.0.0 <= 13.76] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2009" & bd$f.26427.0.0 > 13.76 & bd$f.26427.0.0 <= 21.02] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2009" & bd$f.26427.0.0 > 21.02 & bd$f.26427.0.0 <= 33.72] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="SIMD2009" & bd$f.26427.0.0 > 33.72] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2005" & bd$f.26426.0.0 <= 9.96] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2005" & bd$f.26426.0.0 > 9.96 & bd$f.26426.0.0 <= 14.94] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2005" & bd$f.26426.0.0 > 14.94 & bd$f.26426.0.0 <= 21.16] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2005" & bd$f.26426.0.0 > 21.16 & bd$f.26426.0.0 <= 32.70] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2005" & bd$f.26426.0.0 > 32.70] <- 5
-
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2008" & bd$f.26426.0.0 <= 9.8] <- 1 # wealthiest
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2008" & bd$f.26426.0.0 > 9.8 & bd$f.26426.0.0 <= 14.8] <- 2
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2008" & bd$f.26426.0.0 > 14.8 & bd$f.26426.0.0 <= 21.2] <- 3
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2008" & bd$f.26426.0.0 > 21.2 & bd$f.26426.0.0 <= 32.5] <- 4
-UKB_a$IMD.Q5[UKB_a$IMD.source=="WIMD2008" & bd$f.26426.0.0 > 32.5] <- 5
 
 
 ### add gp record tag into UKB_a####
