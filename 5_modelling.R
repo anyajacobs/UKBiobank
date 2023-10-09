@@ -11,20 +11,20 @@ sr_longhosp <- readRDS(file.path(work_data, "sr_longhosp.rds")) # sr = severe (a
 # ~ exclude fu_years>10 & further filtering by fu_completion
 
 ## Exclude years of follow-up beyond 10 and use this for all following analyses.
-sr_longhosp10y <- sr_longhosp %>% filter(fu_year != "year_11")
-sr_longhosp10y <- sr_longhosp10y %>% filter(fu_year != "year_12")
-sr_longhosp10y <- sr_longhosp10y %>% filter(fu_year != "year_13")
-sr_longhosp10y <- sr_longhosp10y %>% filter(fu_year != "year_14")
-sr_longhosp10y <- sr_longhosp10y %>% filter(fu_year != "year_15")
-sr_longhosp10y <- sr_longhosp10y %>% filter(fu_year != "year_16")
+mr_longhosp10y <- mr_longhosp %>% filter(fu_year != "year_11")
+mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_12")
+mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_13")
+mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_14")
+mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_15")
+mr_longhosp10y <- mr_longhosp10y %>% filter(fu_year != "year_16")
 
 # remove partial years of followup for those who are alive [i.e. the year they were censored] &
 # keep all years for those that died, including partial years [i.e. year of death]
 # (years of 0 completion were already removed earlier).
-sr_longhosp10y <- sr_longhosp10y %>% filter((fu_completion==1 & died==0) | (fu_completion<=1 & died==1))
+mr_longhosp10y <- mr_longhosp10y %>% filter((fu_completion==1 & died==0) | (fu_completion<=1 & died==1))
 
-summary(sr_longhosp10y$fu_completion) 
-# ^ repeat above for each dataset
+summary(mr_longhosp10y$fu_completion) 
+# ^ repeat above for sr_longhosp
 
 
 ## Modelling ############################# 
@@ -129,12 +129,16 @@ screenreg(list(costs1_mr_x, costs2_mr_x, costs3_mr_x, costs4_mr_x))
 
 # negative binomial models for admissions, days, and costs:
 
-admi1_mr_adj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+# FIRST centre age:
+mr_longhosp10y$age.centred <- scale(mr_longhosp10y$age.recruit center = TRUE, scale = FALSE)
+# ^ age is centred at 56-years.
 
-days1_mr_adj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-days2_mr_adj_x <- zeroinfl(rounded_days ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y,
+admi1_mr_adj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+
+days1_mr_adj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+days2_mr_adj_x <- zeroinfl(rounded_days ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y,
                            dist = "negbin")
-costs1_mr_adj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+costs1_mr_adj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
 
 screenreg(list(admi1_mr_adj_x, days1_mr_adj_x, costs1_mr_adj_x))
 
@@ -145,7 +149,7 @@ screenreg(list(admi1_mr_adj_x, days1_mr_adj_x, costs1_mr_adj_x))
 # include the matched covariates AND townsend, BMI, smoking, and comorbidities
 
 # negative binomial model for admissions
-admi1_mr_maxadj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit
+admi1_mr_maxadj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred
                             + sex + ethnicity + townsend + centre
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -154,7 +158,7 @@ admi1_mr_maxadj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit
                             data = mr_longhosp10y)
 
 # negative binomial model for days
-days1_mr_maxadj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+days1_mr_maxadj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                             + sex + ethnicity + townsend + centre
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -162,7 +166,7 @@ days1_mr_maxadj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.re
                             + PVD + mental, 
                             data = mr_longhosp10y)
 # ZINB test
-days2_mr_maxadj_x <- zeroinfl(rounded_days ~ asthma_mild_ONLY + fu_year + age.recruit
+days2_mr_maxadj_x <- zeroinfl(rounded_days ~ asthma_mild_ONLY + fu_year + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -172,7 +176,7 @@ days2_mr_maxadj_x <- zeroinfl(rounded_days ~ asthma_mild_ONLY + fu_year + age.re
 
 
 # negative binomial model for costs
-costs1_mr_maxadj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+costs1_mr_maxadj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                              + sex + ethnicity + townsend + centre
                              + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                              + hypertension + MI.baseline + stroke.baseline 
@@ -186,13 +190,13 @@ costs1_mr_maxadj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age
 # adjust for all 4 matching covariates AND townsend ~ by comparing these models to 
 # minimally adjusted models we can estimate the contribution of deprivation
 
-admi1_mr_interadj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+admi1_mr_interadj_x <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 # compare all 4 models of admissions: [all neg. binomial]
 screenreg(list(admi1_mr_x, admi1_mr_adj_x, admi1_mr_interadj_x, admi1_mr_maxadj_x))
 
-days1_mr_interadj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+days1_mr_interadj_x <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 
-costs1_mr_interadj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+costs1_mr_interadj_x <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 
 screenreg(list(admi1_mr_interadj_x, days1_mr_interadj_x, costs1_mr_interadj_x)
 
@@ -272,21 +276,21 @@ lrtest(admi1_mr_x, admi1_mr)
 # however, the p value is not significant 
 # this means both models fit the data equally well
 
-admi1_mr_adj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+admi1_mr_adj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
 lrtest(admi1_mr_adj_x, admi1_mr_adj)
 # again, though 1st model does have larger LogLik,
 # p>0.05 ~ the p value isn't significant
 # thus the model WITHOUT interaction is better
 
 # [INTER-ADJUSTED]:
-admi1_mr_interadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit
+admi1_mr_interadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.centred
                             + sex + ethnicity + townsend + centre, 
                             data = mr_longhosp10y)
 lrtest(admi1_mr_interadj_x, admi1_mr_interadj)
 # p value is not significant
 
 # maximally adjusted:
-admi1_mr_maxadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit
+admi1_mr_maxadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -302,13 +306,13 @@ days1_mr <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year, data = mr_longho
 lrtest(days1_mr_x, days1_mr)
 # p value is NOT significant
 
-days1_mr_adj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+days1_mr_adj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = mr_longhosp10y)
 lrtest(days1_mr_adj_x, days1_mr_adj)
 #!!  p value IS significant (p<0.001) ***
 # thus model WITH interaction is better
-days1_mr_maxadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+days1_mr_maxadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                           + sex + ethnicity + townsend + centre 
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -320,7 +324,7 @@ lrtest(days1_mr_maxadj_x, days1_mr_maxadj)
 # thus the model WITH interaction is better.
 
 # [INTER-ADJUSTED]:
-days1_mr_interadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+days1_mr_interadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                             + sex + ethnicity + townsend + centre, 
                             data = mr_longhosp10y)
 lrtest(days1_mr_interadj_x, days1_mr_interadj)
@@ -335,13 +339,13 @@ costs1_mr <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year, data = mr_lon
 lrtest(costs2_mr_x, costs1_mr)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-costs1_mr_adj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+costs1_mr_adj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                         + sex + ethnicity + centre, 
                         data = mr_longhosp10y)
 lrtest(costs1_mr_adj_x, costs1_mr_adj)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-costs1_mr_maxadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+costs1_mr_maxadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -352,7 +356,7 @@ lrtest(costs1_mr_maxadj_x, costs1_mr_maxadj)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
 # [INTER-ADJUSTED]:
-costs1_mr_interadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+costs1_mr_interadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                              + sex + ethnicity + townsend + centre, 
                              data = mr_longhosp10y)
 lrtest(costs1_mr_interadj_x, costs1_mr_interadj)
@@ -429,11 +433,11 @@ mr_longhosp10y <- mr_longhosp10y %>%
 
 admi_mr_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year, data = mr_longhosp10y)
 
-admi_mr_adj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+admi_mr_adj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
 
-admi_mr_interadj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+admi_mr_interadj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 
-admi_mr_maxadj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.recruit
+admi_mr_maxadj_n <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -448,12 +452,12 @@ screenreg(list(admi_mr_n, admi_mr_adj_n, admi_mr_interadj_n, admi_mr_maxadj_n))
 days_mr_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year, data = mr_longhosp10y)
 
 days_mr_adj_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * 
-                          new_fu_year + age.recruit + sex 
+                          new_fu_year + age.centred + sex 
                         + ethnicity + centre, data = mr_longhosp10y)
 
-days_mr_interadj_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+days_mr_interadj_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 
-days_mr_maxadj_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.recruit
+days_mr_maxadj_n <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -468,14 +472,14 @@ screenreg(list(days_mr_adj_n, days_mr_interadj_n, days_mr_maxadj_n))
 costs_mr_n <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year, data = mr_longhosp10y)
 
 costs_mr_adj_n <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * 
-                           new_fu_year + age.recruit + sex 
+                           new_fu_year + age.centred + sex 
                          + ethnicity + centre, data = mr_longhosp10y)
 
 costs_mr_interadj_n <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * 
-                                new_fu_year + age.recruit + sex 
+                                new_fu_year + age.centred + sex 
                               + ethnicity + centre + townsend, data = mr_longhosp10y)
 
-costs_mr_maxadj_n <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.recruit
+costs_mr_maxadj_n <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.centred
                             + sex + ethnicity + townsend + centre
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -537,9 +541,9 @@ round(exp((admi_mr_adj_n_cis <- coefci(admi_mr_adj_n, vcov = vcovCL, cluster = ~
 
 #  - admissions - 
 a_mr_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend, data = mr_longhosp10y)
-a_mr_adj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-a_mr_interadj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-a_mr_maxadj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.recruit
+a_mr_adj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+a_mr_interadj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+a_mr_maxadj_dep <- glm.nb(admi_n ~ asthma_mild_ONLY * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -559,9 +563,9 @@ lrtest(admi1_mr_maxadj, a_mr_maxadj_dep) # significant *** = WITHOUT townsend is
 
 #  - days -
 h_mr_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend, data = mr_longhosp10y)
-h_mr_adj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-h_mr_interadj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-h_mr_maxadj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit
+h_mr_adj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+h_mr_interadj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+h_mr_maxadj_dep <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -577,9 +581,9 @@ lrtest(days1_mr_maxadj, h_mr_maxadj_dep) # significant *** = WITHOUT townsend is
 
 #  - costs -
 c_mr_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend, data = mr_longhosp10y)
-c_mr_adj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-c_mr_interadj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-c_mr_maxadj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.recruit
+c_mr_adj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+c_mr_interadj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+c_mr_maxadj_dep <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -622,9 +626,9 @@ mr_longhosp10y$new_townsend <- as.numeric(mr_longhosp10y$townsend)
 
 # - admissions - 
 a_mr_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend, data = mr_longhosp10y)
-a_mr_adj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-a_mr_interadj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-a_mr_maxadj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.recruit
+a_mr_adj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+a_mr_interadj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+a_mr_maxadj_depcont <- glm.nb(admi_n ~ asthma_mild_ONLY * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -659,9 +663,9 @@ round(exp((a_mr_maxadj_depcont_cis <- coefci(a_mr_maxadj_depcont, vcov = vcovCL,
 
 # - days - 
 d_mr_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend, data = mr_longhosp10y)
-d_mr_adj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-d_mr_interadj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre + new_townsend, data = mr_longhosp10y)
-d_mr_maxadj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit
+d_mr_adj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+d_mr_interadj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre + new_townsend, data = mr_longhosp10y)
+d_mr_maxadj_depcont <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -693,9 +697,9 @@ round(exp((d_mr_maxadj_depcont_cis <- coefci(d_mr_maxadj_depcont, vcov = vcovCL,
 
 # - costs - 
 c_mr_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend, data = mr_longhosp10y)
-c_mr_adj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-c_mr_interadj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit + sex + ethnicity + centre + new_townsend, data = mr_longhosp10y)
-c_mr_maxadj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.recruit
+c_mr_adj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+c_mr_interadj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred + sex + ethnicity + centre + new_townsend, data = mr_longhosp10y)
+c_mr_maxadj_depcont <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -735,11 +739,11 @@ round(exp((c_mr_maxadj_depcont_cis <- coefci(c_mr_maxadj_depcont, vcov = vcovCL,
 
 respadmi_mr <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year, data = mr_longhosp10y)
 
-respadmi_mr_adj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+respadmi_mr_adj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
 
-respadmi_mr_interadj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+respadmi_mr_interadj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 
-respadmi_mr_maxadj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+respadmi_mr_maxadj <- glm.nb(respadmi_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                              + sex + ethnicity + townsend + centre
                              + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                              + hypertension + MI.baseline + stroke.baseline 
@@ -779,33 +783,33 @@ round(exp((respadmi_mr_maxadj_cis <- coefci(respadmi_mr_maxadj, vcov = vcovCL, c
 #mr_longhosp10y$ICD_diag01 <- factor(mr_longhosp10y$ICD_diag01, ordered = FALSE,
 #                                   levels = c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 17, 18, 19, 21, 22))
 
-#a_mr_icd <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + ICD_diag01, data = mr_longhosp10y)
+#a_mr_icd <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + ICD_diag01, data = mr_longhosp10y)
 #screenreg(a_mr_icd)
 
 
 # All miminally adjusted models: 
-ICD1admi_mr_adj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD2admi_mr_adj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD3admi_mr_adj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD4admi_mr_adj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD5admi_mr_adj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD6admi_mr_adj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD7admi_mr_adj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD8admi_mr_adj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD9admi_mr_adj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD10admi_mr_adj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD11admi_mr_adj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD12admi_mr_adj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD13admi_mr_adj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD14admi_mr_adj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD15admi_mr_adj <- glm.nb(ICD15_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD16admi_mr_adj <- glm.nb(ICD16_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD17admi_mr_adj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD18admi_mr_adj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD19admi_mr_adj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD20admi_mr_adj <- glm.nb(ICD20_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD21admi_mr_adj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
-ICD22admi_mr_adj <- glm.nb(ICD22_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD1admi_mr_adj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD2admi_mr_adj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD3admi_mr_adj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD4admi_mr_adj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD5admi_mr_adj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD6admi_mr_adj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD7admi_mr_adj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD8admi_mr_adj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD9admi_mr_adj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD10admi_mr_adj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD11admi_mr_adj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD12admi_mr_adj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD13admi_mr_adj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD14admi_mr_adj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD15admi_mr_adj <- glm.nb(ICD15_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD16admi_mr_adj <- glm.nb(ICD16_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD17admi_mr_adj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD18admi_mr_adj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD19admi_mr_adj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD20admi_mr_adj <- glm.nb(ICD20_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD21admi_mr_adj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
+ICD22admi_mr_adj <- glm.nb(ICD22_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre, data = mr_longhosp10y)
 
 # use coeftest to get true significance levels (because clustering by eid's updates the SE's)
 # NB: no admissions recorded associated with ICD 16, 20 or 22. not enough admi's for 15 --
@@ -880,24 +884,24 @@ round(exp((ICD22admi_mr_adj_cis <- coefci(ICD22admi_mr_adj, vcov = vcovCL, clust
 
 # All intermediate adjusted models: 
 #  models not run for ICD 15, 16, 20 & 22 bc either no or not enough admi's --
-ICD1admi_mr_interadj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD2admi_mr_interadj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD3admi_mr_interadj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD4admi_mr_interadj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD5admi_mr_interadj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD6admi_mr_interadj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD7admi_mr_interadj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD8admi_mr_interadj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD9admi_mr_interadj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD10admi_mr_interadj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD11admi_mr_interadj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD12admi_mr_interadj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD13admi_mr_interadj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD14admi_mr_interadj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD17admi_mr_interadj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD18admi_mr_interadj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD19admi_mr_interadj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
-ICD21admi_mr_interadj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD1admi_mr_interadj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD2admi_mr_interadj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD3admi_mr_interadj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD4admi_mr_interadj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD5admi_mr_interadj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD6admi_mr_interadj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD7admi_mr_interadj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD8admi_mr_interadj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD9admi_mr_interadj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD10admi_mr_interadj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD11admi_mr_interadj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD12admi_mr_interadj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD13admi_mr_interadj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD14admi_mr_interadj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD17admi_mr_interadj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD18admi_mr_interadj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD19admi_mr_interadj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
+ICD21admi_mr_interadj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + centre + townsend, data = mr_longhosp10y)
 # use coeftest to get true significance levels (because clustering by eid's updates the SE's)
 round((ICD1admi_mr_interadj_coef <- coeftest(ICD1admi_mr_interadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
 round((ICD2admi_mr_interadj_coef <- coeftest(ICD2admi_mr_interadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
@@ -958,24 +962,24 @@ round(exp((ICD21admi_mr_interadj_cis <- coefci(ICD21admi_mr_interadj, vcov = vco
 
 # Maximally adjusted models: 
 #  models not run for ICD 15, 16, 20 & 22 bc either no or not enough admi's --
-ICD1admi_mr_maxadj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD2admi_mr_maxadj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD3admi_mr_maxadj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD4admi_mr_maxadj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD5admi_mr_maxadj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD6admi_mr_maxadj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD7admi_mr_maxadj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD8admi_mr_maxadj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD9admi_mr_maxadj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD10admi_mr_maxadj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD11admi_mr_maxadj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD12admi_mr_maxadj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD13admi_mr_maxadj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD14admi_mr_maxadj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD17admi_mr_maxadj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y)
-ICD18admi_mr_maxadj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
-ICD19admi_mr_maxadj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y)
-ICD21admi_mr_maxadj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD1admi_mr_maxadj <- glm.nb(ICD1_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD2admi_mr_maxadj <- glm.nb(ICD2_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD3admi_mr_maxadj <- glm.nb(ICD3_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD4admi_mr_maxadj <- glm.nb(ICD4_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD5admi_mr_maxadj <- glm.nb(ICD5_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD6admi_mr_maxadj <- glm.nb(ICD6_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD7admi_mr_maxadj <- glm.nb(ICD7_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD8admi_mr_maxadj <- glm.nb(ICD8_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD9admi_mr_maxadj <- glm.nb(ICD9_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD10admi_mr_maxadj <- glm.nb(ICD10_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD11admi_mr_maxadj <- glm.nb(ICD11_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD12admi_mr_maxadj <- glm.nb(ICD12_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD13admi_mr_maxadj <- glm.nb(ICD13_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD14admi_mr_maxadj <- glm.nb(ICD14_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD17admi_mr_maxadj <- glm.nb(ICD17_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y)
+ICD18admi_mr_maxadj <- glm.nb(ICD18_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
+ICD19admi_mr_maxadj <- glm.nb(ICD19_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y)
+ICD21admi_mr_maxadj <- glm.nb(ICD21_admibyfuyear ~ asthma_mild_ONLY + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = mr_longhosp10y) 
 # use coeftest to get true significance levels 
 round((ICD1admi_mr_maxadj_coef <- coeftest(ICD1admi_mr_maxadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
 round((ICD2admi_mr_maxadj_coef <- coeftest(ICD2admi_mr_maxadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
@@ -1045,7 +1049,8 @@ sr_longhosp10y$smoke <- factor(sr_longhosp10y$smoke, ordered = FALSE, levels = c
 sr_longhosp10y$BMI_cat <- factor(sr_longhosp10y$BMI_cat, ordered = FALSE, levels = c("18.5-25", "<18.5", "25-30", "30-35", "35-40", "40+"))
 sr_longhosp10y$townsend <- factor(sr_longhosp10y$townsend, ordered = FALSE, levels = c(1, 2, 3, 4, 5))
 sr_longhosp10y$centre <- factor(sr_longhosp10y$centre, ordered = FALSE, levels = c(11002, 10003, 11001, 11003, 11004, 11005, 11006, 11007, 11008, 11009, 11010, 11011, 11012, 11013, 11014, 11016, 11017, 11018, 11020, 11021, 11022, 11023))
-
+# centre age:
+sr_longhosp10y$age.centred <- scale(sr_longhosp10y$age.recruit center = TRUE, scale = FALSE)
 
 ####### ~~~ MAIN MODELS #######################################
 # (without fu_year interaction) #
@@ -1054,11 +1059,11 @@ sr_longhosp10y$centre <- factor(sr_longhosp10y$centre, ordered = FALSE, levels =
 
 admi1_sr_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year, data = sr_longhosp10y) # NON-adjusted
 
-admi1_sr_adj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recruit + # MINIMALLY-adjusted
+admi1_sr_adj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.centred + # MINIMALLY-adjusted
                            sex + ethnicity + centre, 
                          data = sr_longhosp10y)
 
-admi1_sr_maxadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recruit # MAXIMALLY-adjusted
+admi1_sr_maxadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.centred # MAXIMALLY-adjusted
                             + sex + ethnicity + townsend + centre
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -1069,7 +1074,7 @@ admi1_sr_maxadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recrui
 # [INTER-ADJUSTED]:
 # adjust for all 4 matching covariates AND townsend ~ by comparing these models to 
 # minimally adjusted models we can estimate the contribution of deprivation
-admi1_sr_interadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recruit # INTERMEDIATE-adjusted
+admi1_sr_interadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.centred # INTERMEDIATE-adjusted
                               + sex + ethnicity + townsend + centre, 
                               data = sr_longhosp10y)
 
@@ -1077,11 +1082,11 @@ admi1_sr_interadj_x <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recr
 
 days1_sr_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year, data = sr_longhosp10y)
 
-days1_sr_adj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+days1_sr_adj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                          + sex + ethnicity + centre, 
                          data = sr_longhosp10y)
 
-days1_sr_maxadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+days1_sr_maxadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                             + sex + ethnicity + townsend + centre 
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -1089,7 +1094,7 @@ days1_sr_maxadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + ag
                             + PVD + mental,
                             data = sr_longhosp10y)
 # [INTER-ADJUSTED]:
-days1_sr_interadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+days1_sr_interadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                               + sex + ethnicity + townsend + centre, 
                               data = sr_longhosp10y)
 
@@ -1097,11 +1102,11 @@ days1_sr_interadj_x <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + 
 
 costs1_sr_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year, data = sr_longhosp10y)
 
-costs1_sr_adj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+costs1_sr_adj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                           + sex + ethnicity + centre, 
                           data = sr_longhosp10y)
 
-costs1_sr_maxadj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+costs1_sr_maxadj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                              + sex + ethnicity + townsend + centre
                              + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                              + hypertension + MI.baseline + stroke.baseline 
@@ -1110,7 +1115,7 @@ costs1_sr_maxadj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year +
                              data = sr_longhosp10y)
 
 # [INTER-ADJUSTED]:
-costs1_sr_interadj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+costs1_sr_interadj_x <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                                + sex + ethnicity + townsend + centre, 
                                data = sr_longhosp10y)
 
@@ -1204,19 +1209,19 @@ lrtest(costs2_sr, costs1_sr_x)
 
 # negative binomial models for admissions, days, and costs:
 
-admi1_sr_adj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.recruit
+admi1_sr_adj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = sr_longhosp10y)
 screenreg(admi1_sr_adj)
 
 
-days1_sr_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+days1_sr_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = sr_longhosp10y)
 screenreg(days1_sr_adj)
 
 
-costs1_sr_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+costs1_sr_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                         + sex + ethnicity + centre, 
                         data = sr_longhosp10y)
 screenreg(costs1_sr_adj)
@@ -1227,7 +1232,7 @@ screenreg(list(admi1_sr_adj, days1_sr_adj, costs1_sr_adj))
 # include the matched covariates AND townsend, BMI, smoking, and comorbidities
 
 # negative binomial model for admissions
-admi1_sr_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.recruit
+admi1_sr_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -1240,7 +1245,7 @@ screenreg(list(admi1_sr, admi1_sr_adj, admi1_sr_maxadj))
 
 
 # negative binomial model for days
-days1_sr_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+days1_sr_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -1253,7 +1258,7 @@ screenreg(list(days1_sr, days1_sr_adj, days1_sr_maxadj))
 
 
 # negative binomial model for costs
-costs1_sr_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+costs1_sr_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -1267,19 +1272,19 @@ screenreg(list(costs1_sr, costs1_sr_adj, costs1_sr_maxadj))
 
 ## 4 - INTERMEDIATE adjusted models:
 
-admi1_sr_interadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.recruit
+admi1_sr_interadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.centred
                             + sex + ethnicity + centre + townsend, 
                             data = sr_longhosp10y)
 screenreg(admi1_sr_interadj)
 
 
-days1_sr_interadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+days1_sr_interadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                             + sex + ethnicity + centre + townsend, 
                             data = sr_longhosp10y)
 screenreg(days1_sr_interadj)
 
 
-costs1_sr_interadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+costs1_sr_interadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                              + sex + ethnicity + centre + townsend, 
                              data = sr_longhosp10y)
 screenreg(costs1_sr_interadj)
@@ -1289,9 +1294,9 @@ screenreg(costs1_sr_interadj)
 ####### ~~~ check deprivation interaction #######################################
 
 a_sr_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend, data = sr_longhosp10y)
-a_sr_adj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-a_sr_interadj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-a_sr_maxadj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.recruit
+a_sr_adj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+a_sr_interadj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+a_sr_maxadj_dep <- glm.nb(admi_n ~ diagnosis_severe_med * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -1305,9 +1310,9 @@ lrtest(admi1_sr_maxadj, a_sr_maxadj_dep) # significant *** = WITHOUT townsend is
 
 
 h_sr_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend, data = sr_longhosp10y)
-h_sr_adj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-h_sr_interadj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-h_sr_maxadj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.recruit
+h_sr_adj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+h_sr_interadj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+h_sr_maxadj_dep <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -1320,9 +1325,9 @@ lrtest(days1_sr_adj, h_sr_adj_dep) # *** significant
 lrtest(days1_sr_maxadj, h_sr_maxadj_dep) # significant *** = WITHOUT townsend is better
 
 c_sr_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend, data = sr_longhosp10y)
-c_sr_adj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-c_sr_interadj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-c_sr_maxadj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.recruit
+c_sr_adj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+c_sr_interadj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+c_sr_maxadj_dep <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * townsend + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -1365,9 +1370,9 @@ sr_longhosp10y$new_townsend <- as.numeric(sr_longhosp10y$townsend)
 
 # - admissions - 
 a_sr_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend, data = sr_longhosp10y)
-a_sr_adj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-a_sr_interadj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
-a_sr_maxadj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.recruit
+a_sr_adj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+a_sr_interadj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
+a_sr_maxadj_depcont <- glm.nb(admi_n ~ diagnosis_severe_med * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -1400,9 +1405,9 @@ round(exp((a_sr_maxadj_depcont_cis <- coefci(a_sr_maxadj_depcont, vcov = vcovCL,
 
 # - days - 
 d_sr_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend, data = sr_longhosp10y)
-d_sr_adj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-d_sr_interadj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
-d_sr_maxadj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit
+d_sr_adj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+d_sr_interadj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
+d_sr_maxadj_depcont <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -1435,9 +1440,9 @@ round(exp((d_sr_maxadj_depcont_cis <- coefci(d_sr_maxadj_depcont, vcov = vcovCL,
 
 # - costs - 
 c_sr_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend, data = sr_longhosp10y)
-c_sr_adj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-c_sr_interadj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
-c_sr_maxadj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.recruit
+c_sr_adj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+c_sr_interadj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred + sex + ethnicity + centre + new_townsend, data = sr_longhosp10y)
+c_sr_maxadj_depcont <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_townsend + age.centred
                               + sex + ethnicity + townsend + centre
                               + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                               + hypertension + MI.baseline + stroke.baseline 
@@ -1489,11 +1494,11 @@ sr_longhosp10y <- sr_longhosp10y %>%
 
 admi_sr_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year, data = sr_longhosp10y)
 
-admi_sr_adj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
+admi_sr_adj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
 
-admi_sr_interadj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+admi_sr_interadj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
 
-admi_sr_maxadj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.recruit
+admi_sr_maxadj_n <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -1508,12 +1513,12 @@ screenreg(list(admi_sr_n, admi_sr_adj_n, admi_sr_interadj_n, admi_sr_maxadj_n))
 days_sr_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year, data = sr_longhosp10y)
 
 days_sr_adj_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * 
-                          new_fu_year + age.recruit + sex 
+                          new_fu_year + age.centred + sex 
                         + ethnicity + centre, data = sr_longhosp10y)
 
-days_sr_interadj_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+days_sr_interadj_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
 
-days_sr_maxadj_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit
+days_sr_maxadj_n <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -1528,13 +1533,13 @@ screenreg(list(days_sr_n, days_sr_adj_n, days_sr_interadj_n, days_sr_maxadj_n))
 costs_sr_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year, data = sr_longhosp10y)
 
 costs_sr_adj_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * 
-                           new_fu_year + age.recruit + sex 
+                           new_fu_year + age.centred + sex 
                          + ethnicity + centre, data = sr_longhosp10y)
 
-costs_sr_interadj_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+costs_sr_interadj_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
 
 
-costs_sr_maxadj_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit
+costs_sr_maxadj_n <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred
                             + sex + ethnicity + townsend + centre
                             + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                             + hypertension + MI.baseline + stroke.baseline 
@@ -1602,11 +1607,11 @@ lrtest(costs1_sr_maxadj, costs_sr_maxadj_n) # NO significance.
 
 respadmi_sr <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year, data = sr_longhosp10y)
 
-respadmi_sr_adj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
+respadmi_sr_adj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
 
-respadmi_sr_interadj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+respadmi_sr_interadj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
 
-respadmi_sr_maxadj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+respadmi_sr_maxadj <- glm.nb(respadmi_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                              + sex + ethnicity + townsend + centre
                              + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                              + hypertension + MI.baseline + stroke.baseline 
@@ -1641,27 +1646,27 @@ round(exp((respadmi_sr_maxadj_cis <- coefci(respadmi_sr_maxadj, vcov = vcovCL, c
 ############## ~~~ by other ICD admissions ###########################################
 
 # All miminally adjusted models: 
-ICD1admi_sr_adj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD2admi_sr_adj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD3admi_sr_adj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD4admi_sr_adj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD5admi_sr_adj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD6admi_sr_adj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD7admi_sr_adj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD8admi_sr_adj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD9admi_sr_adj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD10admi_sr_adj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD11admi_sr_adj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD12admi_sr_adj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD13admi_sr_adj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD14admi_sr_adj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD15admi_sr_adj <- glm.nb(ICD15_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD16admi_sr_adj <- glm.nb(ICD16_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD17admi_sr_adj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD18admi_sr_adj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD19admi_sr_adj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD20admi_sr_adj <- glm.nb(ICD20_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
-ICD21admi_sr_adj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD1admi_sr_adj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD2admi_sr_adj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD3admi_sr_adj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD4admi_sr_adj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD5admi_sr_adj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD6admi_sr_adj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD7admi_sr_adj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD8admi_sr_adj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD9admi_sr_adj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD10admi_sr_adj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD11admi_sr_adj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD12admi_sr_adj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD13admi_sr_adj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD14admi_sr_adj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD15admi_sr_adj <- glm.nb(ICD15_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD16admi_sr_adj <- glm.nb(ICD16_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD17admi_sr_adj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD18admi_sr_adj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD19admi_sr_adj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD20admi_sr_adj <- glm.nb(ICD20_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
+ICD21admi_sr_adj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre, data = sr_longhosp10y)
 # use coeftest to get true significance levels
 round((ICD1admi_sr_adj_coef <- coeftest(ICD1admi_sr_adj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
 round((ICD2admi_sr_adj_coef <- coeftest(ICD2admi_sr_adj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
@@ -1731,24 +1736,24 @@ round(exp((ICD21admi_sr_adj_cis <- coefci(ICD21admi_sr_adj, vcov = vcovCL, clust
 
 # All intermediate adjusted models: 
 #  models not run for ICD 15, 16, 20 & 22 bc either no or not enough admi's --
-ICD1admi_sr_interadj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD2admi_sr_interadj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD3admi_sr_interadj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD4admi_sr_interadj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD5admi_sr_interadj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD6admi_sr_interadj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD7admi_sr_interadj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD8admi_sr_interadj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD9admi_sr_interadj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD10admi_sr_interadj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD11admi_sr_interadj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD12admi_sr_interadj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD13admi_sr_interadj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD14admi_sr_interadj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD17admi_sr_interadj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD18admi_sr_interadj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD19admi_sr_interadj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
-ICD21admi_sr_interadj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD1admi_sr_interadj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD2admi_sr_interadj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD3admi_sr_interadj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD4admi_sr_interadj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD5admi_sr_interadj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD6admi_sr_interadj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD7admi_sr_interadj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD8admi_sr_interadj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD9admi_sr_interadj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD10admi_sr_interadj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD11admi_sr_interadj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD12admi_sr_interadj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD13admi_sr_interadj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD14admi_sr_interadj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD17admi_sr_interadj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD18admi_sr_interadj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD19admi_sr_interadj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
+ICD21admi_sr_interadj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + centre + townsend, data = sr_longhosp10y)
 # use coeftest to get true significance levels (because clustering by eid's updates the SE's)
 round((ICD1admi_sr_interadj_coef <- coeftest(ICD1admi_sr_interadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
 round((ICD2admi_sr_interadj_coef <- coeftest(ICD2admi_sr_interadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
@@ -1809,24 +1814,24 @@ round(exp((ICD21admi_sr_interadj_cis <- coefci(ICD21admi_sr_interadj, vcov = vco
 
 # Maximally adjusted models: 
 #  models not run for ICD 15, 16, 20 & 22 bc either no or not enough admi's --
-ICD1admi_sr_maxadj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD2admi_sr_maxadj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD3admi_sr_maxadj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD4admi_sr_maxadj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD5admi_sr_maxadj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD6admi_sr_maxadj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD7admi_sr_maxadj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD8admi_sr_maxadj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD9admi_sr_maxadj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD10admi_sr_maxadj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD11admi_sr_maxadj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD12admi_sr_maxadj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD13admi_sr_maxadj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD14admi_sr_maxadj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD17admi_sr_maxadj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y)
-ICD18admi_sr_maxadj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
-ICD19admi_sr_maxadj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y)
-ICD21admi_sr_maxadj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.recruit + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD1admi_sr_maxadj <- glm.nb(ICD1_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD2admi_sr_maxadj <- glm.nb(ICD2_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD3admi_sr_maxadj <- glm.nb(ICD3_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD4admi_sr_maxadj <- glm.nb(ICD4_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD5admi_sr_maxadj <- glm.nb(ICD5_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD6admi_sr_maxadj <- glm.nb(ICD6_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD7admi_sr_maxadj <- glm.nb(ICD7_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD8admi_sr_maxadj <- glm.nb(ICD8_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD9admi_sr_maxadj <- glm.nb(ICD9_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD10admi_sr_maxadj <- glm.nb(ICD10_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD11admi_sr_maxadj <- glm.nb(ICD11_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD12admi_sr_maxadj <- glm.nb(ICD12_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD13admi_sr_maxadj <- glm.nb(ICD13_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD14admi_sr_maxadj <- glm.nb(ICD14_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD17admi_sr_maxadj <- glm.nb(ICD17_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y)
+ICD18admi_sr_maxadj <- glm.nb(ICD18_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
+ICD19admi_sr_maxadj <- glm.nb(ICD19_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y)
+ICD21admi_sr_maxadj <- glm.nb(ICD21_admibyfuyear ~ diagnosis_severe_med + fu_year + age.centred + sex + ethnicity + townsend + centre + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre + hypertension + MI.baseline + stroke.baseline + cancer.baseline.all + sleep_apnoea.baseline + CKD + PVD + mental, data = sr_longhosp10y) 
 # use coeftest to get true significance levels 
 round((ICD1admi_sr_maxadj_coef <- coeftest(ICD1admi_sr_maxadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
 round((ICD2admi_sr_maxadj_coef <- coeftest(ICD2admi_sr_maxadj, vcov. = vcovCL, cluster = ~eid)), digits = 2)
@@ -2003,7 +2008,7 @@ screenreg(list(costs2_mf, costs3_mf))
 # NO DEPRIVATION!!
 
 # negative binomial model for admissions
-admi1_mf_adj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit
+admi1_mf_adj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = mf_longhosp10y)
 
@@ -2011,7 +2016,7 @@ admi1_mf_adj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit
 screenreg(list(admi1_mf, admi1_mf_adj))
 
 ## negative binomial length of stay in hospital:
-days1_mf_adj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+days1_mf_adj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = mf_longhosp10y)
 summary(days1_mf_adj)
@@ -2019,7 +2024,7 @@ summary(days1_mf_adj)
 # to test zero-inflated models we need to round days to integers:
 mf_longhosp10y$rounded_days <- round(mf_longhosp10y$hdays_byfuyear, digits = 0)
 days3_mf_adj <- zeroinfl(rounded_days ~ asthma_mild_ONLY * fu_year 
-                         + age.recruit + sex + ethnicity + townsend + centre, 
+                         + age.centred + sex + ethnicity + townsend + centre, 
                          data = mf_longhosp10y, 
                          dist = "negbin")
 # compare both models:
@@ -2027,7 +2032,7 @@ screenreg(list(days1_mf_adj, days3_mf_adj))
 
 
 # negative binomial regression model for costs
-costs1_mf_adj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+costs1_mf_adj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                         + sex + ethnicity + centre, 
                         data = mf_longhosp10y)
 
@@ -2045,7 +2050,7 @@ screenreg(list(costs3_mf, costs1_mf_adj))
 
 
 # negative binomial model for admissions
-admi1_mf_maxadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.recruit
+admi1_mf_maxadj <- glm.nb(admi_n ~ asthma_mild_ONLY * fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2058,7 +2063,7 @@ screenreg(list(admi1_mf, admi1_mf_adj, admi1_mf_maxadj))
 
 
 ## negative binomial length of stay in hospital:
-days1_mf_maxadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+days1_mf_maxadj <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                           + sex + ethnicity + townsend + centre 
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2072,7 +2077,7 @@ screenreg(list(days1_mf, days1_mf_adj, days1_mf_maxadj))
 
 
 # negative binomial regression model for costs
-costs1_mf_maxadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.recruit
+costs1_mf_maxadj <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -2146,14 +2151,14 @@ lrtest(m1admi_mf, noint_admi_mf)
 # p value is significant @ 0.001 
 # thus the model WITH interaction is better
 
-m1admi_adj_2 <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit + 
+m1admi_adj_2 <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred + 
                          sex + ethnicity + townsend + centre, 
                        data = finaldataset10y)
 lrtest(m1admi_adj, m1admi_adj_2)
 # p value is significant @ 0.001
 # thus the model WITH interaction is better
 
-m1admi_maxadj_2 <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.recruit
+m1admi_maxadj_2 <- glm.nb(admi_n ~ asthma_mild_ONLY + fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2172,13 +2177,13 @@ m1days_2 <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year, data = finaldata
 lrtest(m1days, m1days_2)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-m1days_adj_2 <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+m1days_adj_2 <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                        + sex + ethnicity + townsend + centre, 
                        data = finaldataset10y)
 lrtest(m1days_adj, m1days_adj_2)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-m1days_maxadj_2 <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+m1days_maxadj_2 <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                           + sex + ethnicity + townsend + centre 
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2197,13 +2202,13 @@ m3costs_2 <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year, data = finald
 lrtest(m3costs, m3costs_2)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-m1costs_adj_2 <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+m1costs_adj_2 <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                         + sex + ethnicity + townsend + centre, 
                         data = finaldataset10y)
 lrtest(m1costs_adj, m1costs_adj_2)
 # p value is NOT significant
 # thus the model WITHOUT interaction is better
-m1costs_maxadj_2 <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.recruit
+m1costs_maxadj_2 <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY + fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -2227,10 +2232,10 @@ lrtest(m1costs_maxadj, m1costs_maxadj_2)
 admimf_single <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year, data = mf_longhosp10y)
 
 admimf_adj_single <- glm.nb(admi_n ~ asthma_mild_ONLY * 
-                              new_fu_year + age.recruit + sex 
+                              new_fu_year + age.centred + sex 
                             + ethnicity + townsend + centre, data = mf_longhosp10y)
 
-admimf_maxadj_single <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.recruit
+admimf_maxadj_single <- glm.nb(admi_n ~ asthma_mild_ONLY * new_fu_year + age.centred
                                + sex + ethnicity + townsend + centre
                                + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                + hypertension + MI.baseline + stroke.baseline 
@@ -2251,10 +2256,10 @@ screenreg(list(admimf_single, admimf_adj_single, admimf_maxadj_single))
 daysmf_single <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year, data = mf_longhosp10y)
 
 daysmf_adj_single <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * 
-                              new_fu_year + age.recruit + sex 
+                              new_fu_year + age.centred + sex 
                             + ethnicity + townsend + centre, data = mf_longhosp10y)
 
-daysmf_maxadj_single <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.recruit
+daysmf_maxadj_single <- glm.nb(hdays_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.centred
                                + sex + ethnicity + townsend + centre
                                + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                + hypertension + MI.baseline + stroke.baseline 
@@ -2268,10 +2273,10 @@ screenreg(list(daysmf_single, daysmf_adj_single, daysmf_maxadj_single))
 costsmf_single <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year, data = mf_longhosp10y)
 
 costsmf_adj_single <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * 
-                               new_fu_year + age.recruit + sex 
+                               new_fu_year + age.centred + sex 
                              + ethnicity + townsend + centre, data = mf_longhosp10y)
 
-costsmf_maxadj_single <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.recruit
+costsmf_maxadj_single <- glm.nb(totcost_byfuyear ~ asthma_mild_ONLY * new_fu_year + age.centred
                                 + sex + ethnicity + townsend + centre
                                 + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                 + hypertension + MI.baseline + stroke.baseline 
@@ -2333,19 +2338,19 @@ screenreg(list(costs1_sf, costs2_sf))
 
 # negative binomial models for admissions, days, and costs:
 
-admi1_sf_adj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.recruit
+admi1_sf_adj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = sf_longhosp10y)
 screenreg(admi1_sf_adj)
 
 
-days1_sf_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+days1_sf_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                        + sex + ethnicity + centre, 
                        data = sf_longhosp10y)
 screenreg(days1_sf_adj)
 
 
-costs1_sf_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+costs1_sf_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                         + sex + ethnicity + centre, 
                         data = sf_longhosp10y)
 screenreg(costs1_sf_adj)
@@ -2360,7 +2365,7 @@ screenreg(costs1_sf_adj)
 # AND include BMI, smoking, and comorbidities
 
 # negative binomial model for admissions
-admi1_sf_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.recruit
+admi1_sf_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med * fu_year + age.centred
                           + sex + ethnicity + townsend + centre
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2373,7 +2378,7 @@ screenreg(list(admi1_sf, admi1_sf_adj, admi1_sf_maxadj))
 
 
 ## negative binomial length of stay in hospital:
-days1_sf_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+days1_sf_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                           + sex + ethnicity + townsend + centre 
                           + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                           + hypertension + MI.baseline + stroke.baseline 
@@ -2387,7 +2392,7 @@ screenreg(list(days1_sf, days1_sf_adj, days1_sf_maxadj))
 
 
 # negative binomial regression model for costs
-costs1_sf_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.recruit
+costs1_sf_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * fu_year + age.centred
                            + sex + ethnicity + townsend + centre
                            + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                            + hypertension + MI.baseline + stroke.baseline 
@@ -2453,14 +2458,14 @@ lrtest(admi1_severity, admi2_severity)
 # p value is significant @ 0.001
 # thus the model WITH interaction is better
 
-admi2_severity_adj <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recruit
+admi2_severity_adj <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.centred
                              + sex + ethnicity + townsend + centre, 
                              data = sf_longhosp10y)
 lrtest(admi1_severity_adj, admi2_severity_adj)
 # p value is significant @ 0.01
 # thus the model WITH interaction is better
 
-admi2_severity_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.recruit
+admi2_severity_maxadj <- glm.nb(admi_n ~ diagnosis_severe_med + fu_year + age.centred
                                 + sex + ethnicity + townsend + centre
                                 + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                 + hypertension + MI.baseline + stroke.baseline 
@@ -2479,14 +2484,14 @@ lrtest(days1_severity, days2_severity)
 # p value is significant @ 0.001
 # thus the model WITH interaction is better
 
-days2_severity_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+days2_severity_adj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                              + sex + ethnicity + townsend + centre, 
                              data = sf_longhosp10y)
 lrtest(days1_severity_adj, days2_severity_adj)
 # p value is significant @ 0.001
 # thus model WITH interaction is better
 
-days2_severity_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+days2_severity_maxadj <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                                 + sex + ethnicity + townsend + centre
                                 + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                 + hypertension + MI.baseline + stroke.baseline 
@@ -2504,14 +2509,14 @@ lrtest(costs2_severity, costs3_severity)
 # p value = non-significant
 # thus model WITHOUT interaction is better
 
-costs2_severity_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+costs2_severity_adj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                               + sex + ethnicity + townsend + centre, 
                               data = sf_longhosp10y)
 lrtest(costs1_severity_adj, costs2_severity_adj)
 # p value = non-significant
 # thus model WITHOUT interaction is better
 
-costs2_severity_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.recruit
+costs2_severity_maxadj <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med + fu_year + age.centred
                                  + sex + ethnicity + townsend + centre
                                  + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                  + hypertension + MI.baseline + stroke.baseline 
@@ -2532,10 +2537,10 @@ lrtest(costs1_severity_maxadj, costs2_severity_maxadj)
 admi_severity_single <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year, data = sf_longhosp10y)
 
 admi_severity_adj_single <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year +
-                                     age.recruit + sex 
+                                     age.centred + sex 
                                    + ethnicity + townsend + centre, data = sf_longhosp10y)
 
-admi_severity_maxadj_single <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.recruit
+admi_severity_maxadj_single <- glm.nb(admi_n ~ diagnosis_severe_med * new_fu_year + age.centred
                                       + sex + ethnicity + townsend + centre
                                       + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                       + hypertension + MI.baseline + stroke.baseline 
@@ -2549,10 +2554,10 @@ screenreg(list(admi_severity_single, admi_severity_adj_single, admi_severity_max
 days_severity_single <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year, data = sf_longhosp10y)
 
 days_severity_adj_single <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * 
-                                     new_fu_year + age.recruit + sex 
+                                     new_fu_year + age.centred + sex 
                                    + ethnicity + townsend + centre, data = sf_longhosp10y)
 
-days_severity_maxadj_single <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit
+days_severity_maxadj_single <- glm.nb(hdays_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred
                                       + sex + ethnicity + townsend + centre
                                       + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                       + hypertension + MI.baseline + stroke.baseline 
@@ -2566,10 +2571,10 @@ screenreg(list(days_severity_single, days_severity_adj_single, days_severity_max
 costs_severity_single <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year, data = sf_longhosp10y)
 
 costs_severity_adj_single <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * 
-                                      new_fu_year + age.recruit + sex 
+                                      new_fu_year + age.centred + sex 
                                     + ethnicity + townsend + centre, data = sf_longhosp10y)
 
-costs_severity_maxadj_single <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.recruit
+costs_severity_maxadj_single <- glm.nb(totcost_byfuyear ~ diagnosis_severe_med * new_fu_year + age.centred
                                        + sex + ethnicity + townsend + centre
                                        + smoke + BMI_cat + COPD.baseline + diabetes.fo.pre
                                        + hypertension + MI.baseline + stroke.baseline 
