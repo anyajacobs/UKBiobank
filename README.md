@@ -4,6 +4,8 @@
 
 The R scripts in this repository document the code used for analyses in the paper "Strong and graded associations between level of asthma severity and all-cause hospital care use and costs in the UK" https://bmjopenrespres.bmj.com/content/10/1/e002003.full
 
+------------------------------------------------------------------
+
 Please progress through the code in the following order of scripts: 
 
 • 1_define_variables.R: this script loads and cleans data and defines key variables for the population (age, sex, MI, stroke, 
